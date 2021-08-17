@@ -1,7 +1,13 @@
 #include <random>
 #include <iostream>
 #include <tuple>
+#include <chrono>
 #include "hmc.h"
+
+void output_trajectory(double position, double momentum)
+{
+    std::cout << position << "\t" << momentum << std::endl;
+}
 
 HMC::HMC(double momentum_mean,
          double momentum_std,
@@ -9,8 +15,7 @@ HMC::HMC(double momentum_mean,
          double (*potential_energy)(double q)) : gradient{gradient},
                                                  potential_energy{potential_energy}
 {
-    std::random_device rd;
-    std::mt19937 rnd_generator{rd()};
+    std::mt19937 rnd_generator{std::chrono::steady_clock::now().time_since_epoch().count()};
     std::normal_distribution<double> momentum_sampler{momentum_mean, momentum_std};
 };
 
@@ -32,11 +37,13 @@ double HMC::kinetic_energy(double p)
 
 std::tuple<double, double> HMC::leapfrog(double position, double momentum, int num_steps, double step_size)
 {
+    output_trajectory(position, momentum);
     momentum -= step_size * 0.5 * gradient(position);
     for (int i{0}; i < num_steps; ++i)
     {
         position += step_size * momentum;
         momentum -= step_size * gradient(position);
+        output_trajectory(position, momentum);
     }
     position += step_size * momentum;
     momentum -= step_size * 0.5 * gradient(position);
@@ -47,7 +54,6 @@ std::tuple<double, double> HMC::leapfrog(double position, double momentum, int n
 double HMC::hamiltonian_monte_carlo(double initial_position, int num_steps, double step_size)
 {
     double initial_momentum{sample_momentum()};
-    // std::cout << "momentum: " << initial_momentum << std::endl;
 
     auto [final_position, final_momentum] = leapfrog(initial_position, initial_momentum, num_steps, step_size);
 
@@ -58,7 +64,6 @@ double HMC::hamiltonian_monte_carlo(double initial_position, int num_steps, doub
         kinetic_energy(initial_momentum) + potential_energy(initial_position)};
 
     double normal_sample{sample_zero_mean()};
-    // std::cout << "normal sample: " << normal_sample << std::endl;
 
     if (exp(initial_hamiltonian - final_hamiltonian) > normal_sample)
     {

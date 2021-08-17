@@ -1,11 +1,12 @@
 #include <vector>
 #include <iostream>
+#include <chrono>
 #include "hmc.h"
 
-// gradient computes the gradient of the logarithm of the target density.
+// gradient computes the gradient of the negative logarithm of the target density.
 double gradient(double q)
 {
-    return -q;
+    return q;
 };
 
 // potential_energy computes the negative logarithm of the target density.
@@ -35,7 +36,6 @@ int main(int argc, char *argv[])
     for (int i{0}; i <= sample_size; ++i)
     {
         sampled_value = hmc.hamiltonian_monte_carlo(sampled_value, num_steps, step_size);
-        std::cout << sampled_value << std::endl;
     }
 
     return 0;
