@@ -13,7 +13,7 @@ private:
     // potential_energy computes the negative logarithm of the target density.
     double (*potential_energy)(double q);
 
-    // gradient computes the gradient of the logarithm of the target density.
+    // gradient computes the gradient of the negative logarithm of the target density.
     double (*gradient)(double q);
 
     // private class methods

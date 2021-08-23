@@ -37,16 +37,13 @@ double HMC::kinetic_energy(double p)
 
 std::tuple<double, double> HMC::leapfrog(double position, double momentum, int num_steps, double step_size)
 {
-    output_trajectory(position, momentum);
-    momentum -= step_size * 0.5 * gradient(position);
     for (int i{0}; i < num_steps; ++i)
     {
+        momentum -= step_size * 0.5 * gradient(position);
         position += step_size * momentum;
-        momentum -= step_size * gradient(position);
+        momentum -= step_size * 0.5 * gradient(position);
         output_trajectory(position, momentum);
     }
-    position += step_size * momentum;
-    momentum -= step_size * 0.5 * gradient(position);
 
     return {position, momentum};
 }
