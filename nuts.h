@@ -30,11 +30,10 @@ private:
     std::mt19937 rnd_generator{std::chrono::steady_clock::now().time_since_epoch().count()};
     std::normal_distribution<double> standard_normal{0.0, 1.0};
     double step_size{1};
-    bool burned_in{false};
     double mu;
     double sigma;
     double H;
-    int burn_in_iterations;
+    int warm_up_iterations;
 
     double sample_momentum();
     double sample_direction();
@@ -49,6 +48,6 @@ private:
     double log_momentum_density(double momentum);
 
 public:
-    NUTS(double initial_position, double sigma, int burn_in_iterations);
+    NUTS(double initial_position, double sigma, int warm_up_iterations);
     double single_sample(double initial_position);
 };

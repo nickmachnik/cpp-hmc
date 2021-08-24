@@ -6,7 +6,7 @@
 NUTS::NUTS(double initial_position,
            double sigma,
            int burn_in_iterations) : sigma{sigma},
-                                     burn_in_iterations{burn_in_iterations} {};
+                                     warm_up_iterations{warm_up_iterations} {};
 
 // logarithm of the target density function
 double NUTS::log_target_density(double position)
@@ -84,10 +84,6 @@ double NUTS::sample_direction()
 
 double NUTS::single_sample(double initial_position)
 {
-    if (!burned_in)
-    {
-    }
-
     // r
     double momentum{sample_momentum()};
     // w (theta, r)
