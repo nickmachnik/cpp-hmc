@@ -176,6 +176,7 @@ auto NUTS::build_tree(const build_tree_params &params) -> build_tree_output
         }
     }
 
+    // !!!!!!!!!!!!!!!!!!!!! is sampled position always 0?
     if (biased_coin_toss(
             (double)side_tree_output.n_accepted_states /
             (double)(output.n_accepted_states + side_tree_output.n_accepted_states)))
