@@ -2,6 +2,8 @@
 #include <random>
 #include <chrono>
 #include "nuts.h"
+#include <iostream>
+#include <stdlib.h>
 
 NUTS::NUTS(double sigma) : sigma{sigma} {};
 
@@ -41,6 +43,8 @@ auto NUTS::leapfrog(state w, direction dir = direction::right) -> state
     w.position += dir * step_size * w.momentum;
     w.momentum += dir * 0.5 * step_size * target_gradient(w.position);
 
+    // std::cout << w.position << "\t" << w.momentum << "\t" << step_size << std::endl;
+
     return w;
 }
 
@@ -52,6 +56,7 @@ auto NUTS::step_size_is_reasonable(state w_old, state w_new, double a) -> bool
 // see Hoffman and Gelman (2014)
 void NUTS::find_reasonable_step_size(double position)
 {
+    step_size = 1.0;
     state w{position, sample_momentum()};
     state w_new{leapfrog(w)};
     double a{2.0 * ((joint_density(w_new) / joint_density(w)) > 0.5) - 1.0};
@@ -222,6 +227,8 @@ auto NUTS::sample(
                 new_sub_tree = build_tree(new_sub_tree_params);
                 rightmost_w = new_sub_tree.leftmost_w;
             }
+            alpha = new_sub_tree.acceptance_probability;
+            n_alpha = new_sub_tree.total_states;
 
             double transition_probability{
                 std::min(1.0, (double)new_sub_tree.n_accepted_states / (double)n_accepted_states)};
@@ -236,14 +243,21 @@ auto NUTS::sample(
             ++tree_height;
         }
 
+        std::cout << "iteration: " << m << std::endl;
+
         if (m <= warm_up_iterations)
         {
             double f = 1.0 / (m + t_0);
             double av_alpha = alpha / double(n_alpha);
             H = (1.0 - f) * H + f * (sigma - av_alpha);
-            step_size = exp(mu - sqrt(m) / gamma);
+            std::cout << "new H: " << H << std::endl;
+
+            step_size = exp(mu - H * (sqrt(m) / gamma));
+            std::cout << "new step size: " << step_size << std::endl;
+
             double mpk{pow(m, -kappa)};
-            step_size_hat = exp(mpk * log(step_size) + (1 - mpk) * log(step_size_hat));
+            step_size_hat = exp((mpk * log(step_size)) + ((1 - mpk) * log(step_size_hat)));
+            std::cout << "new step size hat: " << step_size_hat << std::endl;
         }
         else if (m == (warm_up_iterations + 1))
         {
