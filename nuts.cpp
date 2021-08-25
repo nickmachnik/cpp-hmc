@@ -43,7 +43,8 @@ auto NUTS::leapfrog(state w, direction dir = direction::right) -> state
     w.position += dir * step_size * w.momentum;
     w.momentum += dir * 0.5 * step_size * target_gradient(w.position);
 
-    // std::cout << w.position << "\t" << w.momentum << "\t" << step_size << std::endl;
+    // std::cout << w.position << "\t" << w.momentum << "\t" << step_size << "\t"
+    //           << "false" << std::endl;
 
     return w;
 }
@@ -187,7 +188,7 @@ auto NUTS::sample(
     size_t warm_up_iterations) -> std::vector<double>
 {
     // thetas
-    std::vector<double> positions{initial_position};
+    std::vector<double> positions(total_iterations, initial_position);
     find_reasonable_step_size(initial_position);
     double mu{log(10 * step_size)};
     double H{0.0};
@@ -200,7 +201,7 @@ auto NUTS::sample(
     for (size_t m{1}; m < total_iterations; ++m)
     {
         // theta^m = theta^m-1, resample r0
-        state initial_w{positions.back(), sample_momentum()};
+        state initial_w{positions[m - 1], sample_momentum()};
         // u
         double slice{sample_slice_threshold(initial_w)};
         state leftmost_w = initial_w;
@@ -234,7 +235,7 @@ auto NUTS::sample(
                 std::min(1.0, (double)new_sub_tree.n_accepted_states / (double)n_accepted_states)};
             if (new_sub_tree.continue_integration && biased_coin_toss(transition_probability))
             {
-                positions.push_back(new_sub_tree.sampled_position);
+                positions[m] = new_sub_tree.sampled_position;
             }
 
             n_accepted_states += new_sub_tree.n_accepted_states;
@@ -243,12 +244,16 @@ auto NUTS::sample(
             ++tree_height;
         }
 
-        std::cout << "iteration: " << m << std::endl;
-
         if (m <= warm_up_iterations)
         {
             double f = 1.0 / (m + t_0);
+            std::cout << "iteration weight: " << f << std::endl;
+
             double av_alpha = alpha / double(n_alpha);
+            std::cout << "alpha: " << alpha << std::endl;
+            std::cout << "n_alpha: " << n_alpha << std::endl;
+            std::cout << "av alpha: " << av_alpha << std::endl;
+
             H = (1.0 - f) * H + f * (sigma - av_alpha);
             std::cout << "new H: " << H << std::endl;
 
@@ -263,6 +268,9 @@ auto NUTS::sample(
         {
             step_size = step_size_hat;
         }
+
+        // std::cout << positions[m] << "\t" << 0 << "\t" << step_size << "\t"
+        //           << "true" << std::endl;
     }
 
     return positions;
