@@ -109,6 +109,12 @@ auto NUTS::acceptance_probability(state w_new, state w_old) -> double
         return 1.0;
     }
 
+    if (prob < 0.0)
+    {
+        std::cout << "negative acceptance probability: " << prob << std::endl;
+        std::exit(1);
+    }
+
     return prob;
 }
 
@@ -138,6 +144,10 @@ auto NUTS::build_tree(const build_tree_params &params) -> build_tree_output
         output.continue_integration = params.slice < integration_accuracy_threshold(w_new);
 
         output.acceptance_probability = acceptance_probability(w_new, params.initial_chain_w);
+        if (output.acceptance_probability < 0.0)
+        {
+            std::cout << "negative alpha in base case: " << output.acceptance_probability << std::endl;
+        }
         output.total_states = 1;
 
         return output;
@@ -173,7 +183,21 @@ auto NUTS::build_tree(const build_tree_params &params) -> build_tree_output
         output.sampled_position = side_tree_output.sampled_position;
     }
 
+    if (side_tree_output.acceptance_probability < 0.0)
+    {
+        std::cout << "negative alpha in side tree: " << side_tree_output.acceptance_probability << std::endl;
+    }
+
+    double alpha_pre = output.acceptance_probability;
     output.acceptance_probability += side_tree_output.acceptance_probability;
+    if (output.acceptance_probability < 0.0)
+    {
+        std::cout << "negative alpha resulting from " << alpha_pre << "+"
+                  << side_tree_output.acceptance_probability << "="
+                  << output.acceptance_probability << std::endl;
+        std::exit(1);
+    }
+
     output.total_states += side_tree_output.total_states;
     output.n_accepted_states += side_tree_output.n_accepted_states;
     output.continue_integration = side_tree_output.continue_integration &&
