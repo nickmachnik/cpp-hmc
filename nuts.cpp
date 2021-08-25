@@ -43,8 +43,8 @@ auto NUTS::leapfrog(state w, direction dir = direction::right) -> state
     w.position += dir * step_size * w.momentum;
     w.momentum += dir * 0.5 * step_size * target_gradient(w.position);
 
-    // std::cout << w.position << "\t" << w.momentum << "\t" << step_size << "\t"
-    //           << "false" << std::endl;
+    std::cout << w.position << "\t" << w.momentum << "\t" << step_size << "\t"
+              << "false" << std::endl;
 
     return w;
 }
@@ -109,11 +109,11 @@ auto NUTS::acceptance_probability(state w_new, state w_old) -> double
         return 1.0;
     }
 
-    if (prob < 0.0)
-    {
-        std::cout << "negative acceptance probability: " << prob << std::endl;
-        std::exit(1);
-    }
+    // if (prob < 0.0)
+    // {
+    //     std::cout << "negative acceptance probability: " << prob << std::endl;
+    //     std::exit(1);
+    // }
 
     return prob;
 }
@@ -144,10 +144,10 @@ auto NUTS::build_tree(const build_tree_params &params) -> build_tree_output
         output.continue_integration = params.slice < integration_accuracy_threshold(w_new);
 
         output.acceptance_probability = acceptance_probability(w_new, params.initial_chain_w);
-        if (output.acceptance_probability < 0.0)
-        {
-            std::cout << "negative alpha in base case: " << output.acceptance_probability << std::endl;
-        }
+        // if (output.acceptance_probability < 0.0)
+        // {
+        //     std::cout << "negative alpha in base case: " << output.acceptance_probability << std::endl;
+        // }
         output.total_states = 1;
 
         return output;
@@ -183,20 +183,22 @@ auto NUTS::build_tree(const build_tree_params &params) -> build_tree_output
         output.sampled_position = side_tree_output.sampled_position;
     }
 
-    if (side_tree_output.acceptance_probability < 0.0)
-    {
-        std::cout << "negative alpha in side tree: " << side_tree_output.acceptance_probability << std::endl;
-    }
+    // if (side_tree_output.acceptance_probability < 0.0)
+    // {
+    //     std::cout << "negative alpha in side tree: " << side_tree_output.acceptance_probability << std::endl;
+    // }
 
-    double alpha_pre = output.acceptance_probability;
+    // std::cout << "computing: " << output.acceptance_probability << "+" << side_tree_output.acceptance_probability << std::endl;
+
+    // double alpha_pre = output.acceptance_probability;
     output.acceptance_probability += side_tree_output.acceptance_probability;
-    if (output.acceptance_probability < 0.0)
-    {
-        std::cout << "negative alpha resulting from " << alpha_pre << "+"
-                  << side_tree_output.acceptance_probability << "="
-                  << output.acceptance_probability << std::endl;
-        std::exit(1);
-    }
+    // if (output.acceptance_probability < 0.0)
+    // {
+    //     std::cout << "negative alpha resulting from " << alpha_pre << "+"
+    //               << side_tree_output.acceptance_probability << "="
+    //               << output.acceptance_probability << std::endl;
+    //     std::exit(1);
+    // }
 
     output.total_states += side_tree_output.total_states;
     output.n_accepted_states += side_tree_output.n_accepted_states;
@@ -216,14 +218,16 @@ auto NUTS::sample(
     find_reasonable_step_size(initial_position);
     double mu{log(10 * step_size)};
     double H{0.0};
-    int tree_height{0};
-    int n_accepted_states{1};
     double alpha{};
     int n_alpha{};
     double step_size_hat{1.0};
 
     for (size_t m{1}; m < total_iterations; ++m)
     {
+        // j
+        int tree_height{0};
+        // n
+        int n_accepted_states{1};
         // theta^m = theta^m-1, resample r0
         state initial_w{positions[m - 1], sample_momentum()};
         // u
@@ -257,6 +261,11 @@ auto NUTS::sample(
 
             double transition_probability{
                 std::min(1.0, (double)new_sub_tree.n_accepted_states / (double)n_accepted_states)};
+            // std::cout << "transition probability: " << transition_probability << std::endl;
+            // std::cout << "new accepted states: " << new_sub_tree.n_accepted_states << std::endl;
+            // std::cout << "old accepted states: " << n_accepted_states << std::endl;
+            // std::cout << "tree height: " << tree_height << std::endl;
+
             if (new_sub_tree.continue_integration && biased_coin_toss(transition_probability))
             {
                 positions[m] = new_sub_tree.sampled_position;
@@ -271,30 +280,30 @@ auto NUTS::sample(
         if (m <= warm_up_iterations)
         {
             double f = 1.0 / (m + t_0);
-            std::cout << "iteration weight: " << f << std::endl;
+            // std::cout << "iteration weight: " << f << std::endl;
 
             double av_alpha = alpha / double(n_alpha);
-            std::cout << "alpha: " << alpha << std::endl;
-            std::cout << "n_alpha: " << n_alpha << std::endl;
-            std::cout << "av alpha: " << av_alpha << std::endl;
+            // std::cout << "alpha: " << alpha << std::endl;
+            // std::cout << "n_alpha: " << n_alpha << std::endl;
+            // std::cout << "av alpha: " << av_alpha << std::endl;
 
             H = (1.0 - f) * H + f * (sigma - av_alpha);
-            std::cout << "new H: " << H << std::endl;
+            // std::cout << "new H: " << H << std::endl;
 
             step_size = exp(mu - H * (sqrt(m) / gamma));
-            std::cout << "new step size: " << step_size << std::endl;
+            // std::cout << "new step size: " << step_size << std::endl;
 
             double mpk{pow(m, -kappa)};
             step_size_hat = exp((mpk * log(step_size)) + ((1 - mpk) * log(step_size_hat)));
-            std::cout << "new step size hat: " << step_size_hat << std::endl;
+            // std::cout << "new step size hat: " << step_size_hat << std::endl;
         }
         else if (m == (warm_up_iterations + 1))
         {
             step_size = step_size_hat;
         }
 
-        // std::cout << positions[m] << "\t" << 0 << "\t" << step_size << "\t"
-        //           << "true" << std::endl;
+        std::cout << positions[m] << "\t" << 0 << "\t" << step_size << "\t"
+                  << "true" << std::endl;
     }
 
     return positions;

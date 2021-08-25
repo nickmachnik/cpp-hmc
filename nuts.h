@@ -43,15 +43,15 @@ struct build_tree_output
     state leftmost_w;
     state rightmost_w;
     // theta'
-    double sampled_position;
+    double sampled_position{0.0};
     // n'
-    int n_accepted_states;
+    int n_accepted_states{0};
     // s'
-    bool continue_integration;
+    bool continue_integration{true};
     // alpha
-    double acceptance_probability;
+    double acceptance_probability{0.0};
     // n_alpha
-    double total_states;
+    double total_states{0};
 
     build_tree_output(){};
 
