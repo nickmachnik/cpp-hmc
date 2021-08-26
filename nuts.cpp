@@ -26,18 +26,18 @@ auto NUTS::log_momentum_density(double momentum) -> double
 }
 
 // joint density of position and momentum
-auto NUTS::joint_density(state w) -> double
+auto NUTS::joint_density(State w) -> double
 {
     return exp(log_momentum_density(w.momentum) + log_target_density(w.position));
 }
 
 // joint density of position and momentum
-auto NUTS::integration_accuracy_threshold(state w) -> double
+auto NUTS::integration_accuracy_threshold(State w) -> double
 {
     return exp(delta_max + log_momentum_density(w.momentum) + log_target_density(w.position));
 }
 
-auto NUTS::leapfrog(state w, direction dir = direction::right) -> state
+auto NUTS::leapfrog(State w, Direction dir = Direction::right) -> State
 {
     w.momentum += dir * 0.5 * step_size * target_gradient(w.position);
     w.position += dir * step_size * w.momentum;
@@ -49,7 +49,7 @@ auto NUTS::leapfrog(state w, direction dir = direction::right) -> state
     return w;
 }
 
-auto NUTS::step_size_is_reasonable(state w_old, state w_new, double a) -> bool
+auto NUTS::step_size_is_reasonable(State w_old, State w_new, double a) -> bool
 {
     return pow((joint_density(w_new) / joint_density(w_old)), a) <= pow(2, -a);
 }
@@ -58,8 +58,8 @@ auto NUTS::step_size_is_reasonable(state w_old, state w_new, double a) -> bool
 void NUTS::find_reasonable_step_size(double position)
 {
     step_size = 1.0;
-    state w{position, sample_momentum()};
-    state w_new{leapfrog(w)};
+    State w{position, sample_momentum()};
+    State w_new{leapfrog(w)};
     double a{2.0 * ((joint_density(w_new) / joint_density(w)) > 0.5) - 1.0};
     while (!step_size_is_reasonable(w, w_new, a))
     {
@@ -68,7 +68,7 @@ void NUTS::find_reasonable_step_size(double position)
     }
 }
 
-auto NUTS::sample_slice_threshold(state w) -> double
+auto NUTS::sample_slice_threshold(State w) -> double
 {
     double upper_bound{
         exp(
@@ -80,16 +80,16 @@ auto NUTS::sample_slice_threshold(state w) -> double
     return u_dist(rnd_generator);
 }
 
-auto NUTS::sample_direction() -> direction
+auto NUTS::sample_direction() -> Direction
 {
     double c{standard_normal(rnd_generator)};
 
     if (c >= 0)
     {
-        return direction::right;
+        return Direction::right;
     }
 
-    return direction::left;
+    return Direction::left;
 }
 
 auto NUTS::sample_momentum() -> double
@@ -97,7 +97,7 @@ auto NUTS::sample_momentum() -> double
     return standard_normal(rnd_generator);
 }
 
-auto NUTS::acceptance_probability(state w_new, state w_old) -> double
+auto NUTS::acceptance_probability(State w_new, State w_old) -> double
 {
     double prob{
         exp(
@@ -125,19 +125,19 @@ auto NUTS::biased_coin_toss(double heads_probability) -> bool
     return dist(rnd_generator);
 }
 
-auto NUTS::is_u_turn(state leftmost_w, state rightmost_w) -> bool
+auto NUTS::is_u_turn(State leftmost_w, State rightmost_w) -> bool
 {
     double delta_position{rightmost_w.position - leftmost_w.position};
     return ((delta_position * rightmost_w.momentum) < 0) || ((delta_position * leftmost_w.momentum) < 0);
 }
 
-auto NUTS::build_tree(const build_tree_params &params) -> build_tree_output
+auto NUTS::build_tree(const BuildTreeParams &params) -> BuildTreeOutput
 {
     if (params.height == 0)
     {
-        state w_new{leapfrog(params.initial_tree_w, params.dir)};
+        State w_new{leapfrog(params.initial_tree_w, params.dir)};
 
-        build_tree_output output{
+        BuildTreeOutput output{
             // leftmost
             w_new,
             // rightmost
@@ -156,23 +156,23 @@ auto NUTS::build_tree(const build_tree_params &params) -> build_tree_output
         return output;
     }
 
-    build_tree_params sub_tree_params = params;
+    BuildTreeParams sub_tree_params = params;
     sub_tree_params.height -= 1;
-    build_tree_output output{build_tree(sub_tree_params)};
+    BuildTreeOutput output{build_tree(sub_tree_params)};
 
-    build_tree_output side_tree_output{};
+    BuildTreeOutput side_tree_output{};
     if (output.continue_integration)
     {
-        if (params.dir == direction::left)
+        if (params.dir == Direction::left)
         {
-            build_tree_params left_tree_params = sub_tree_params;
+            BuildTreeParams left_tree_params = sub_tree_params;
             left_tree_params.initial_tree_w = output.leftmost_w;
             side_tree_output = build_tree(left_tree_params);
             output.leftmost_w = side_tree_output.leftmost_w;
         }
         else
         {
-            build_tree_params right_tree_params = sub_tree_params;
+            BuildTreeParams right_tree_params = sub_tree_params;
             right_tree_params.initial_tree_w = output.rightmost_w;
             side_tree_output = build_tree(right_tree_params);
             output.rightmost_w = side_tree_output.rightmost_w;
@@ -223,22 +223,22 @@ auto NUTS::sample(
         // n
         int n_accepted_states{1};
         // theta^m = theta^m-1, resample r0
-        state initial_w{positions[m - 1], sample_momentum()};
+        State initial_w{positions[m - 1], sample_momentum()};
         // u
         double slice{sample_slice_threshold(initial_w)};
-        state leftmost_w = initial_w;
-        state rightmost_w = initial_w;
+        State leftmost_w = initial_w;
+        State rightmost_w = initial_w;
         // s
         bool continue_integration{true};
-        build_tree_params new_sub_tree_params{initial_w, slice, direction::right, tree_height, initial_w};
+        BuildTreeParams new_sub_tree_params{initial_w, slice, Direction::right, tree_height, initial_w};
 
         while (continue_integration)
         {
             // v
-            direction v{sample_direction()};
+            Direction v{sample_direction()};
 
-            build_tree_output new_sub_tree{};
-            if (v == direction::left)
+            BuildTreeOutput new_sub_tree{};
+            if (v == Direction::left)
             {
                 new_sub_tree_params.initial_tree_w = leftmost_w;
                 new_sub_tree = build_tree(new_sub_tree_params);
@@ -270,22 +270,11 @@ auto NUTS::sample(
         if (m <= warm_up_iterations)
         {
             double f = 1.0 / (m + t_0);
-            // std::cout << "iteration weight: " << f << std::endl;
-
             double av_alpha = alpha / double(n_alpha);
-            // std::cout << "alpha: " << alpha << std::endl;
-            // std::cout << "n_alpha: " << n_alpha << std::endl;
-            // std::cout << "av alpha: " << av_alpha << std::endl;
-
             H = (1.0 - f) * H + f * (sigma - av_alpha);
-            // std::cout << "new H: " << H << std::endl;
-
             step_size = exp(mu - H * (sqrt(m) / gamma));
-            // std::cout << "new step size: " << step_size << std::endl;
-
             double mpk{pow(m, -kappa)};
             step_size_hat = exp((mpk * log(step_size)) + ((1 - mpk) * log(step_size_hat)));
-            // std::cout << "new step size hat: " << step_size_hat << std::endl;
         }
         else if (m == (warm_up_iterations + 1))
         {
