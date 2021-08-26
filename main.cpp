@@ -37,8 +37,8 @@ auto main(int argc, char *argv[]) -> int
         }
 
         HMC hmc{0.0, 1.0, &gradient, &potential_energy};
-        int sample_size{strtol(argv[2], nullptr, 10)};
-        int num_steps{strtol(argv[3], nullptr, 10)};
+        int sample_size{static_cast<int>(strtol(argv[2], nullptr, 10))};
+        int num_steps{static_cast<int>(strtol(argv[3], nullptr, 10))};
         double step_size{strtod(argv[4], nullptr)};
         double sampled_value{strtod(argv[5], nullptr)};
 
@@ -61,8 +61,8 @@ auto main(int argc, char *argv[]) -> int
         }
 
         double position{strtod(argv[2], nullptr)};
-        size_t total_iterations{strtol(argv[3], nullptr, 10)};
-        size_t warm_up_iterations{strtol(argv[4], nullptr, 10)};
+        size_t total_iterations{static_cast<size_t>(strtol(argv[3], nullptr, 10))};
+        size_t warm_up_iterations{static_cast<size_t>(strtol(argv[4], nullptr, 10))};
         double sigma{strtod(argv[5], nullptr)};
 
         NUTS nuts{sigma};

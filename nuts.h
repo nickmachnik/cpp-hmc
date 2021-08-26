@@ -80,7 +80,7 @@ private:
     const double kappa{0.75};
     const double delta_max{1000};
 
-    std::mt19937 rnd_generator{std::chrono::steady_clock::now().time_since_epoch().count()};
+    std::mt19937 rnd_generator{static_cast<unsigned long>(std::chrono::steady_clock::now().time_since_epoch().count())};
     std::normal_distribution<double> standard_normal{0.0, 1.0};
     double step_size{1.0};
     // desired average acceptance rate

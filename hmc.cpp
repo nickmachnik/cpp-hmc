@@ -1,7 +1,6 @@
 #include <random>
 #include <iostream>
 #include <tuple>
-#include <chrono>
 #include "hmc.h"
 
 void output_trajectory(double position, double momentum)
@@ -15,7 +14,6 @@ HMC::HMC(double momentum_mean,
          double (*potential_energy)(double q)) : gradient{gradient},
                                                  potential_energy{potential_energy}
 {
-    std::mt19937 rnd_generator{std::chrono::steady_clock::now().time_since_epoch().count()};
     std::normal_distribution<double> momentum_sampler{momentum_mean, momentum_std};
 };
 
