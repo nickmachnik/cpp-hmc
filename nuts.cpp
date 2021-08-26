@@ -186,23 +186,7 @@ auto NUTS::build_tree(const build_tree_params &params) -> build_tree_output
         output.sampled_position = side_tree_output.sampled_position;
     }
 
-    // if (side_tree_output.acceptance_probability < 0.0)
-    // {
-    //     std::cout << "negative alpha in side tree: " << side_tree_output.acceptance_probability << std::endl;
-    // }
-
-    // std::cout << "computing: " << output.acceptance_probability << "+" << side_tree_output.acceptance_probability << std::endl;
-
-    // double alpha_pre = output.acceptance_probability;
     output.acceptance_probability += side_tree_output.acceptance_probability;
-    // if (output.acceptance_probability < 0.0)
-    // {
-    //     std::cout << "negative alpha resulting from " << alpha_pre << "+"
-    //               << side_tree_output.acceptance_probability << "="
-    //               << output.acceptance_probability << std::endl;
-    //     std::exit(1);
-    // }
-
     output.total_states += side_tree_output.total_states;
     output.n_accepted_states += side_tree_output.n_accepted_states;
     output.continue_integration = side_tree_output.continue_integration &&
@@ -224,9 +208,16 @@ auto NUTS::sample(
     double alpha{};
     int n_alpha{};
     double step_size_hat{1.0};
+    bool successful_sample{true};
 
     for (size_t m{1}; m < total_iterations; ++m)
     {
+        if (!successful_sample)
+        {
+            --m;
+        }
+        successful_sample = false;
+
         // j
         int tree_height{0};
         // n
@@ -264,14 +255,10 @@ auto NUTS::sample(
 
             double transition_probability{
                 std::min(1.0, (double)new_sub_tree.n_accepted_states / (double)n_accepted_states)};
-            // std::cout << "transition probability: " << transition_probability << std::endl;
-            // std::cout << "new accepted states: " << new_sub_tree.n_accepted_states << std::endl;
-            // std::cout << "old accepted states: " << n_accepted_states << std::endl;
-            // std::cout << "tree height: " << tree_height << std::endl;
-
             if (new_sub_tree.continue_integration && biased_coin_toss(transition_probability))
             {
                 positions[m] = new_sub_tree.sampled_position;
+                successful_sample = true;
             }
 
             n_accepted_states += new_sub_tree.n_accepted_states;
@@ -305,7 +292,7 @@ auto NUTS::sample(
             step_size = step_size_hat;
         }
 
-        if (m > warm_up_iterations)
+        if (m > warm_up_iterations && successful_sample)
         {
             std::cout << positions[m] << "\t" << 0 << "\t" << step_size << "\t"
                       << "true" << std::endl;
