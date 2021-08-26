@@ -45,6 +45,8 @@ auto main(int argc, char *argv[]) -> int
         for (int i{0}; i <= sample_size; ++i)
         {
             sampled_value = hmc.hamiltonian_monte_carlo(sampled_value, num_steps, step_size);
+            std::cout << sampled_value << "\t" << 0 << "\t" << 0 << "\t"
+                      << "True" << std::endl;
         }
     }
     else if (strcmp(argv[1], "nuts") == 0)

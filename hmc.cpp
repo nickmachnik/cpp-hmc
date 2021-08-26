@@ -42,7 +42,7 @@ std::tuple<double, double> HMC::leapfrog(double position, double momentum, int n
         momentum -= step_size * 0.5 * gradient(position);
         position += step_size * momentum;
         momentum -= step_size * 0.5 * gradient(position);
-        output_trajectory(position, momentum);
+        // output_trajectory(position, momentum);
     }
 
     return {position, momentum};
