@@ -135,20 +135,23 @@ auto NUTS::build_tree(const build_tree_params &params) -> build_tree_output
 {
     if (params.height == 0)
     {
-        build_tree_output output{};
         state w_new{leapfrog(params.initial_tree_w, params.dir)};
-        output.leftmost_w = w_new;
-        output.rightmost_w = w_new;
 
-        output.n_accepted_states = (params.slice <= joint_density(w_new)) ? 1 : 0;
-        output.continue_integration = params.slice < integration_accuracy_threshold(w_new);
-
-        output.acceptance_probability = acceptance_probability(w_new, params.initial_chain_w);
-        // if (output.acceptance_probability < 0.0)
-        // {
-        //     std::cout << "negative alpha in base case: " << output.acceptance_probability << std::endl;
-        // }
-        output.total_states = 1;
+        build_tree_output output{
+            // leftmost
+            w_new,
+            // rightmost
+            w_new,
+            // sampled position
+            w_new.position,
+            // n_accepted_states
+            (params.slice <= joint_density(w_new)) ? 1 : 0,
+            // continue integration
+            params.slice < integration_accuracy_threshold(w_new),
+            // acceptance prob
+            acceptance_probability(w_new, params.initial_chain_w),
+            // total states
+            1};
 
         return output;
     }
@@ -176,7 +179,6 @@ auto NUTS::build_tree(const build_tree_params &params) -> build_tree_output
         }
     }
 
-    // !!!!!!!!!!!!!!!!!!!!! is sampled position always 0?
     if (biased_coin_toss(
             (double)side_tree_output.n_accepted_states /
             (double)(output.n_accepted_states + side_tree_output.n_accepted_states)))
@@ -303,8 +305,11 @@ auto NUTS::sample(
             step_size = step_size_hat;
         }
 
-        std::cout << positions[m] << "\t" << 0 << "\t" << step_size << "\t"
-                  << "true" << std::endl;
+        if (m > warm_up_iterations)
+        {
+            std::cout << positions[m] << "\t" << 0 << "\t" << step_size << "\t"
+                      << "true" << std::endl;
+        }
     }
 
     return positions;

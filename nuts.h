@@ -53,7 +53,7 @@ struct build_tree_output
     // n_alpha
     double total_states{0};
 
-    build_tree_output(){};
+    build_tree_output() = default;
 
     build_tree_output(state leftmost_w,
                       state rightmost_w,
