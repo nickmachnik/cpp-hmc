@@ -13,6 +13,42 @@ public:
     virtual double log_density_gradient(double position) = 0;
 };
 
+class Weibull : public Target
+{
+private:
+    // shape
+    double k;
+    // scale
+    double lambda;
+    double log_frac_k_lambda;
+
+public:
+    double log_density(double position)
+    {
+        if (position <= 0)
+        {
+            return 0;
+        }
+        return log_frac_k_lambda +
+               (k - 1) * (log(position) - log(lambda)) -
+               pow((position / lambda), k);
+    }
+
+    double log_density_gradient(double position)
+    {
+        if (position <= 0)
+        {
+            return 0;
+        }
+        return ((k - 1) / position) - (k * pow(position / lambda, k - 1)) / lambda;
+    }
+
+    Weibull(double k, double lambda) : k{k}, lambda{lambda}
+    {
+        log_frac_k_lambda = log(k) - log(lambda);
+    };
+};
+
 class StandardNormal : public Target
 {
 public:
