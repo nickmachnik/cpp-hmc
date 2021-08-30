@@ -1,7 +1,9 @@
 #pragma once
+#include <iostream>
 #include <chrono>
 #include <random>
 #include <vector>
+#include "target.h"
 
 // a position-momentum state
 struct State
@@ -80,6 +82,7 @@ private:
     const double kappa{0.75};
     const double delta_max{1000};
 
+    Target &target;
     std::mt19937 rnd_generator{static_cast<unsigned long>(std::chrono::steady_clock::now().time_since_epoch().count())};
     std::normal_distribution<double> standard_normal{0.0, 1.0};
     double step_size{1.0};
@@ -94,8 +97,6 @@ private:
     void find_reasonable_step_size(double position);
 
     double joint_density(State w);
-    double target_gradient(double position);
-    double log_target_density(double position);
     double log_momentum_density(double momentum);
     double integration_accuracy_threshold(State w);
     double acceptance_probability(State w_new, State w_old);
@@ -104,6 +105,12 @@ private:
     BuildTreeOutput build_tree(const BuildTreeParams &params);
 
 public:
-    explicit NUTS(double sigma);
+    NUTS(double sigma, Target &target) : sigma{sigma}, target{target} {};
     std::vector<double> sample(double initial_position, size_t total_iterations, size_t warm_up_iterations);
+
+    void test_target_density_functions(double position)
+    {
+        std::cout << target.log_density(position) << std::endl;
+        std::cout << target.log_density_gradient(position) << std::endl;
+    }
 };
