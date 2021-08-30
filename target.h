@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 
 class Target
 {
@@ -13,6 +14,19 @@ public:
 };
 
 class StandardNormal : public Target
+{
+public:
+    double log_density(double position)
+    {
+        return (-0.5 * position * position) - log(sqrt(M_PI * 2));
+    }
+    double log_density_gradient(double position)
+    {
+        return -position;
+    }
+};
+
+class UnscaledStandardNormal : public Target
 {
 public:
     double log_density(double position)
