@@ -107,10 +107,4 @@ private:
 public:
     NUTS(double sigma, Target &target) : sigma{sigma}, target{target} {};
     std::vector<double> sample(double initial_position, size_t total_iterations, size_t warm_up_iterations);
-
-    void test_target_density_functions(double position)
-    {
-        std::cout << target.log_density(position) << std::endl;
-        std::cout << target.log_density_gradient(position) << std::endl;
-    }
 };
