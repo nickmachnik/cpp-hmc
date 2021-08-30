@@ -1,11 +1,12 @@
 #pragma once
 #include <vector>
 #include <random>
+#include <chrono>
 
 class HMC
 {
 private:
-    std::mt19937 rnd_generator;
+    std::mt19937 rnd_generator{static_cast<unsigned long>(std::chrono::steady_clock::now().time_since_epoch().count())};
     std::normal_distribution<double> momentum_sampler{};
     std::normal_distribution<double> normal_zero_sampler{0.0, 1.0};
 
