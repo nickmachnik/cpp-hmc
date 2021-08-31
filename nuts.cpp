@@ -5,20 +5,6 @@
 #include <iostream>
 #include <stdlib.h>
 
-NUTS::NUTS(double sigma) : sigma{sigma} {};
-
-// logarithm of the target density function
-auto NUTS::log_target_density(double position) -> double
-{
-    return -0.5 * position * position;
-}
-
-// gradient of the target density function
-auto NUTS::target_gradient(double position) -> double
-{
-    return -position;
-}
-
 // logarithm of the density function of the auxiliary momentum
 auto NUTS::log_momentum_density(double momentum) -> double
 {
@@ -28,20 +14,20 @@ auto NUTS::log_momentum_density(double momentum) -> double
 // joint density of position and momentum
 auto NUTS::joint_density(State w) -> double
 {
-    return exp(log_momentum_density(w.momentum) + log_target_density(w.position));
+    return exp(log_momentum_density(w.momentum) + target.log_density(w.position));
 }
 
 // joint density of position and momentum
 auto NUTS::integration_accuracy_threshold(State w) -> double
 {
-    return exp(delta_max + log_momentum_density(w.momentum) + log_target_density(w.position));
+    return exp(delta_max + log_momentum_density(w.momentum) + target.log_density(w.position));
 }
 
 auto NUTS::leapfrog(State w, Direction dir = Direction::right) -> State
 {
-    w.momentum += dir * 0.5 * step_size * target_gradient(w.position);
+    w.momentum += dir * 0.5 * step_size * target.log_density_gradient(w.position);
     w.position += dir * step_size * w.momentum;
-    w.momentum += dir * 0.5 * step_size * target_gradient(w.position);
+    w.momentum += dir * 0.5 * step_size * target.log_density_gradient(w.position);
 
     std::cout << w.position << "\t" << w.momentum << "\t" << step_size << "\t"
               << "false" << std::endl;
@@ -72,7 +58,7 @@ auto NUTS::sample_slice_threshold(State w) -> double
 {
     double upper_bound{
         exp(
-            log_target_density(w.position) +
+            target.log_density(w.position) +
             log_momentum_density(w.momentum))};
 
     std::uniform_real_distribution<double> u_dist(0.0, upper_bound);
@@ -101,8 +87,8 @@ auto NUTS::acceptance_probability(State w_new, State w_old) -> double
 {
     double prob{
         exp(
-            log_target_density(w_new.position) + log_momentum_density(w_new.momentum) -
-            log_target_density(w_old.position) - log_momentum_density(w_old.momentum))};
+            target.log_density(w_new.position) + log_momentum_density(w_new.momentum) -
+            target.log_density(w_old.position) - log_momentum_density(w_old.momentum))};
 
     if (prob > 1.0)
     {
