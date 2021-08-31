@@ -66,7 +66,7 @@ auto main(int argc, char *argv[]) -> int
         size_t warm_up_iterations{static_cast<size_t>(strtol(argv[4], nullptr, 10))};
         double sigma{strtod(argv[5], nullptr)};
 
-        StandardNormal target{};
+        Laplace target{3, 6};
         NUTS nuts{sigma, target};
         std::vector<double> res{nuts.sample(position, total_iterations, warm_up_iterations)};
     }
