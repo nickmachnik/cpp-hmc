@@ -2,40 +2,55 @@
 #include <cmath>
 #include <Eigen/Dense>
 
-template <class T>
-class Target
+class MVTarget
 {
 public:
     // Logarithm of the target density function.
-    virtual double log_density(T position) = 0;
+    virtual double log_density(Eigen::VectorXd position) = 0;
     // Gradient of the log target density function.
-    virtual T log_density_gradient(T position) = 0;
+    virtual Eigen::VectorXd log_density_gradient(Eigen::VectorXd position) = 0;
 };
 
-// class MVN : public Target
-// {
-// private:
-//     double n;
-//     double sqrt2pi = std::sqrt(2 * M_PI);
-//     const Eigen::VectorXd &mean;
-//     const Eigen::MatrixXd &sigma;
+class UVTarget
+{
+public:
+    // Logarithm of the target density function.
+    virtual double log_density(double position) = 0;
+    // Gradient of the log target density function.
+    virtual double log_density_gradient(double position) = 0;
+};
 
-// public:
-//     MVN(const Eigen::VectorXd &mean, const Eigen::MatrixXd &sigma) : mean{mean}, sigma{sigma}, n{mean.rows()} {};
-// };
+class MVN : public MVTarget
+{
+private:
+    double d;
+    double log2pi = log(2 * M_PI);
+    const Eigen::VectorXd &mean;
+    const Eigen::MatrixXd &sigma;
+    double log_sigma_determinant;
+    Eigen::MatrixXd sigma_inverse;
 
-// Mvn::pdf(const Eigen::VectorXd &x) const
-// {
-//     double n = x.rows();
-//     double sqrt2pi = std::sqrt(2 * M_PI);
-//     double quadform = (x - mean).transpose() * sigma.inverse() * (x - mean);
-//     double norm = std::pow(sqrt2pi, -n) *
-//                   std::pow(sigma.determinant(), -0.5);
+public:
+    MVN(const Eigen::VectorXd &mean, const Eigen::MatrixXd &sigma) : mean{mean}, sigma{sigma}, d{mean.rows()}
+    {
+        log_sigma_determinant = log(sigma.determinant());
+        sigma_inverse = sigma.inverse();
+    }
 
-//     return norm * exp(-0.5 * quadform);
-// }
+    double log_density(Eigen::VectorXd position)
+    {
+        return -0.5 * ((d * log2pi) +
+                       log_sigma_determinant +
+                       ((position - mean).transpose() * sigma_inverse * (position - mean)));
+    }
 
-class Laplace : public Target<double>
+    Eigen::VectorXd log_density_gradient(Eigen::VectorXd position)
+    {
+        return -position;
+    }
+};
+
+class Laplace : public UVTarget
 {
 private:
     // mean
@@ -64,7 +79,7 @@ public:
     }
 };
 
-class StandardNormal : public Target<double>
+class StandardNormal : public UVTarget
 {
 public:
     double log_density(double position)
@@ -77,7 +92,7 @@ public:
     }
 };
 
-class UnscaledStandardNormal : public Target<double>
+class UnscaledStandardNormal : public UVTarget
 {
 public:
     double log_density(double position)

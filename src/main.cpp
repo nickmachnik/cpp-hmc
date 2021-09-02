@@ -61,14 +61,22 @@ auto main(int argc, char *argv[]) -> int
             return 1;
         }
 
-        double position{strtod(argv[2], nullptr)};
+        double initial_position{strtod(argv[2], nullptr)};
         size_t total_iterations{static_cast<size_t>(strtol(argv[3], nullptr, 10))};
         size_t warm_up_iterations{static_cast<size_t>(strtol(argv[4], nullptr, 10))};
-        double sigma{strtod(argv[5], nullptr)};
+        double aim_acceptance_probability{strtod(argv[5], nullptr)};
 
-        Laplace target{3, 6};
-        NUTS nuts{sigma, target};
-        std::vector<double> res{nuts.sample(position, total_iterations, warm_up_iterations)};
+        // Laplace target{3, 6};
+        Eigen::VectorXd position(2);
+        position << initial_position, initial_position;
+        Eigen::MatrixXd sigma(2, 2);
+        sigma << 10, 7, 7, 5;
+        Eigen::VectorXd mean(2);
+        mean << 2, 2;
+        MVN target{mean, sigma};
+        MVStandardNormalSampler momentum_sampler{2};
+        NUTS nuts{aim_acceptance_probability, target, momentum_sampler};
+        nuts.sample(position, total_iterations, warm_up_iterations);
     }
     else
     {
