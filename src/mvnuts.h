@@ -78,9 +78,9 @@ struct BuildTreeOutput
                                            total_states{total_states} {};
 };
 
-// A No-U-Turn Sampler with Dual Averaging.
+// A No-U-Turn Sampler with Dual Averaging for multi-variate target distributions.
 // Featuring dynamic integration length and automatic step size selection.
-class NUTS
+class MVNUTS
 {
 private:
     const double gamma{0.05};
@@ -110,28 +110,28 @@ private:
     BuildTreeOutput build_tree(const BuildTreeParams &params);
 
 public:
-    NUTS(double sigma,
-         MVTarget &target,
-         MVMomentumSampler &momentum_sampler) : sigma{sigma},
-                                                target{target},
-                                                momentum_sampler{momentum_sampler} {};
+    MVNUTS(double sigma,
+           MVTarget &target,
+           MVMomentumSampler &momentum_sampler) : sigma{sigma},
+                                                  target{target},
+                                                  momentum_sampler{momentum_sampler} {};
 
     std::vector<Position> sample(Position initial_position, size_t total_iterations, size_t warm_up_iterations);
 };
 
 // joint density of position and momentum
-auto NUTS::joint_density(MVState w) -> double
+auto MVNUTS::joint_density(MVState w) -> double
 {
     return exp(momentum_sampler.log_density(w.momentum) + target.log_density(w.position));
 }
 
 // joint density of position and momentum
-auto NUTS::integration_accuracy_threshold(MVState w) -> double
+auto MVNUTS::integration_accuracy_threshold(MVState w) -> double
 {
     return exp(delta_max + momentum_sampler.log_density(w.momentum) + target.log_density(w.position));
 }
 
-auto NUTS::leapfrog(MVState w, Direction dir) -> MVState
+auto MVNUTS::leapfrog(MVState w, Direction dir) -> MVState
 {
     w.momentum += dir * 0.5 * step_size * target.log_density_gradient(w.position);
     w.position += dir * step_size * w.momentum;
@@ -143,13 +143,13 @@ auto NUTS::leapfrog(MVState w, Direction dir) -> MVState
     return w;
 }
 
-auto NUTS::step_size_is_reasonable(MVState w_old, MVState w_new, double a) -> bool
+auto MVNUTS::step_size_is_reasonable(MVState w_old, MVState w_new, double a) -> bool
 {
     return pow((joint_density(w_new) / joint_density(w_old)), a) <= pow(2, -a);
 }
 
 // see Hoffman and Gelman (2014)
-void NUTS::find_reasonable_step_size(Position position)
+void MVNUTS::find_reasonable_step_size(Position position)
 {
     step_size = 1.0;
     MVState w{position, momentum_sampler.sample()};
@@ -162,7 +162,7 @@ void NUTS::find_reasonable_step_size(Position position)
     }
 }
 
-auto NUTS::sample_slice_threshold(MVState w) -> double
+auto MVNUTS::sample_slice_threshold(MVState w) -> double
 {
     double upper_bound{
         exp(
@@ -174,7 +174,7 @@ auto NUTS::sample_slice_threshold(MVState w) -> double
     return u_dist(rnd_generator);
 }
 
-auto NUTS::sample_direction() -> Direction
+auto MVNUTS::sample_direction() -> Direction
 {
     double c{standard_normal(rnd_generator)};
 
@@ -186,7 +186,7 @@ auto NUTS::sample_direction() -> Direction
     return Direction::left;
 }
 
-auto NUTS::acceptance_probability(MVState w_new, MVState w_old) -> double
+auto MVNUTS::acceptance_probability(MVState w_new, MVState w_old) -> double
 {
     double prob{
         exp(
@@ -207,21 +207,21 @@ auto NUTS::acceptance_probability(MVState w_new, MVState w_old) -> double
     return prob;
 }
 
-auto NUTS::biased_coin_toss(double heads_probability) -> bool
+auto MVNUTS::biased_coin_toss(double heads_probability) -> bool
 {
     std::bernoulli_distribution dist{heads_probability};
 
     return dist(rnd_generator);
 }
 
-auto NUTS::is_u_turn(MVState leftmost_w, MVState rightmost_w) -> bool
+auto MVNUTS::is_u_turn(MVState leftmost_w, MVState rightmost_w) -> bool
 {
     Position delta_position{rightmost_w.position - leftmost_w.position};
     return ((delta_position.transpose() * rightmost_w.momentum) < 0) ||
            ((delta_position.transpose() * leftmost_w.momentum) < 0);
 }
 
-auto NUTS::build_tree(const BuildTreeParams &params) -> BuildTreeOutput
+auto MVNUTS::build_tree(const BuildTreeParams &params) -> BuildTreeOutput
 {
     if (params.height == 0)
     {
@@ -285,7 +285,7 @@ auto NUTS::build_tree(const BuildTreeParams &params) -> BuildTreeOutput
     return output;
 }
 
-auto NUTS::sample(
+auto MVNUTS::sample(
     Position initial_position,
     size_t total_iterations,
     size_t warm_up_iterations) -> std::vector<Position>

@@ -4,6 +4,8 @@
 #include <cstring>
 #include "hmc.h"
 #include "nuts.h"
+#include "mvnuts.h"
+#include "momentum_sampler.h"
 #include "target.h"
 
 // gradient computes the gradient of the negative logarithm of the target density.
@@ -75,7 +77,7 @@ auto main(int argc, char *argv[]) -> int
         mean << 2, 2;
         MVN target{mean, sigma};
         MVStandardNormalSampler momentum_sampler{2};
-        NUTS nuts{aim_acceptance_probability, target, momentum_sampler};
+        MVNUTS nuts{aim_acceptance_probability, target, momentum_sampler};
         nuts.sample(position, total_iterations, warm_up_iterations);
     }
     else
