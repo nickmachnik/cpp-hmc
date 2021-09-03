@@ -46,7 +46,7 @@ public:
 
     Eigen::VectorXd log_density_gradient(Eigen::VectorXd position)
     {
-        return -position;
+        return -sigma_inverse * (position - mean);
     }
 };
 

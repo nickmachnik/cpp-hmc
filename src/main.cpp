@@ -68,7 +68,7 @@ auto main(int argc, char *argv[]) -> int
         size_t warm_up_iterations{static_cast<size_t>(strtol(argv[4], nullptr, 10))};
         double aim_acceptance_probability{strtod(argv[5], nullptr)};
 
-        // Laplace target{3, 6};
+        // Laplace target{100, 6};
         // UVStandardNormalSampler momentum_sampler{};
         // double position = initial_position;
         // NUTS nuts{aim_acceptance_probability, target, momentum_sampler};
@@ -79,7 +79,7 @@ auto main(int argc, char *argv[]) -> int
         sigma << 10, 7, 7, 5;
         // sigma << 1, 0, 0, 1;
         Eigen::VectorXd mean(2);
-        mean << 2, 2;
+        mean << 100, 100;
         MVN target{mean, sigma};
         MVStandardNormalSampler momentum_sampler{2};
         MVNUTS nuts{aim_acceptance_probability, target, momentum_sampler};
