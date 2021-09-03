@@ -158,7 +158,7 @@ auto MVNUTS::integration_accuracy_threshold(MVState w) -> double
     return exp(delta_max + momentum_sampler.log_density(w.momentum) + target.log_density(w.position));
 }
 
-auto MVNUT::log_integration_accuracy_threshold(MVState w) -> double
+auto MVNUTS::log_integration_accuracy_threshold(MVState w) -> double
 {
     return delta_max + momentum_sampler.log_density(w.momentum) + target.log_density(w.position);
 }
@@ -266,9 +266,9 @@ auto MVNUTS::build_tree(const BuildTreeParamsMV &params) -> BuildTreeOutputMV
             // sampled position
             w_new.position,
             // n_accepted_states
-            (params.slice <= joint_density(w_new)) ? 1 : 0,
+            (log(params.slice) <= log_joint_density(w_new)) ? 1 : 0,
             // continue integration
-            params.slice < integration_accuracy_threshold(w_new),
+            log(params.slice) < log_integration_accuracy_threshold(w_new),
             // acceptance prob
             acceptance_probability(w_new, params.initial_chain_w),
             // total states
