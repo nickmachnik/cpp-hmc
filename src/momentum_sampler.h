@@ -34,6 +34,7 @@ class MVMomentumSampler
 public:
     virtual Eigen::VectorXd sample() = 0;
     virtual double log_density(Eigen::VectorXd momentum) = 0;
+    virtual size_t get_dimensions() = 0;
 };
 
 class MVStandardNormalSampler : public MVMomentumSampler
@@ -59,6 +60,8 @@ public:
     {
         return -0.5 * (dimensions * log2pi + momentum.transpose() * momentum);
     }
+
+    size_t get_dimensions() { return dimensions; };
 
     MVStandardNormalSampler(size_t dimensions) : dimensions{dimensions} {};
 };

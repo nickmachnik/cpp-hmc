@@ -7,9 +7,34 @@
 #include <math.h>
 #include <stdlib.h>
 #include "momentum_sampler.h"
+#include "nuts.h"
 
 using Position = Eigen::VectorXd;
 using Momentum = Eigen::VectorXd;
+
+void print_sampler_state(Position pos, Momentum mom, bool is_sample, double step_size, size_t dims)
+{
+    for (size_t i{0}; i < dims; ++i)
+    {
+        std::cout << pos(i);
+        if (i != dims - 1)
+        {
+            std::cout << ",";
+        }
+    }
+    std::cout << "\t";
+
+    for (size_t i{0}; i < dims; ++i)
+    {
+        std::cout << mom(i);
+        if (i != dims - 1)
+        {
+            std::cout << ",";
+        }
+    }
+    std::cout << "\t" << step_size << "\t"
+              << is_sample << std::endl;
+}
 
 // a position-momentum state
 struct MVState
@@ -21,13 +46,7 @@ struct MVState
     MVState(Position position, Momentum momentum) : position{position}, momentum{momentum} {};
 };
 
-enum Direction
-{
-    left = -1,
-    right = 1,
-};
-
-struct BuildTreeParams
+struct BuildTreeParamsMV
 {
     MVState initial_tree_w;
     double slice;
@@ -35,18 +54,18 @@ struct BuildTreeParams
     int height;
     MVState initial_chain_w;
 
-    BuildTreeParams(MVState initial_tree_w,
-                    double slice,
-                    Direction dir,
-                    int height,
-                    MVState initial_chain_w) : initial_tree_w{initial_tree_w},
-                                               slice{slice},
-                                               dir{dir},
-                                               height{height},
-                                               initial_chain_w{initial_chain_w} {};
+    BuildTreeParamsMV(MVState initial_tree_w,
+                      double slice,
+                      Direction dir,
+                      int height,
+                      MVState initial_chain_w) : initial_tree_w{initial_tree_w},
+                                                 slice{slice},
+                                                 dir{dir},
+                                                 height{height},
+                                                 initial_chain_w{initial_chain_w} {};
 };
 
-struct BuildTreeOutput
+struct BuildTreeOutputMV
 {
     MVState leftmost_w;
     MVState rightmost_w;
@@ -61,21 +80,21 @@ struct BuildTreeOutput
     // n_alpha
     double total_states{0};
 
-    BuildTreeOutput() = default;
+    BuildTreeOutputMV() = default;
 
-    BuildTreeOutput(MVState leftmost_w,
-                    MVState rightmost_w,
-                    Eigen::VectorXd sampled_position,
-                    int n_accepted_states,
-                    bool continue_integration,
-                    double acceptance_probability,
-                    double total_states) : leftmost_w{leftmost_w},
-                                           rightmost_w{rightmost_w},
-                                           sampled_position{sampled_position},
-                                           n_accepted_states{n_accepted_states},
-                                           continue_integration{continue_integration},
-                                           acceptance_probability{acceptance_probability},
-                                           total_states{total_states} {};
+    BuildTreeOutputMV(MVState leftmost_w,
+                      MVState rightmost_w,
+                      Position sampled_position,
+                      int n_accepted_states,
+                      bool continue_integration,
+                      double acceptance_probability,
+                      double total_states) : leftmost_w{leftmost_w},
+                                             rightmost_w{rightmost_w},
+                                             sampled_position{sampled_position},
+                                             n_accepted_states{n_accepted_states},
+                                             continue_integration{continue_integration},
+                                             acceptance_probability{acceptance_probability},
+                                             total_states{total_states} {};
 };
 
 // A No-U-Turn Sampler with Dual Averaging for multi-variate target distributions.
@@ -90,6 +109,7 @@ private:
 
     MVTarget &target;
     MVMomentumSampler &momentum_sampler;
+    size_t dimensions;
     std::mt19937 rnd_generator{static_cast<unsigned long>(std::chrono::steady_clock::now().time_since_epoch().count())};
     std::normal_distribution<double> standard_normal{0.0, 1.0};
     double step_size{1.0};
@@ -107,7 +127,7 @@ private:
     double acceptance_probability(MVState w_new, MVState w_old);
     bool biased_coin_toss(double heads_probability);
     bool is_u_turn(MVState leftmost_w, MVState rightmost_w);
-    BuildTreeOutput build_tree(const BuildTreeParams &params);
+    BuildTreeOutputMV build_tree(const BuildTreeParamsMV &params);
 
 public:
     MVNUTS(double sigma,
@@ -137,8 +157,7 @@ auto MVNUTS::leapfrog(MVState w, Direction dir) -> MVState
     w.position += dir * step_size * w.momentum;
     w.momentum += dir * 0.5 * step_size * target.log_density_gradient(w.position);
 
-    std::cout << w.position << "\t" << w.momentum << "\t" << step_size << "\t"
-              << "false" << std::endl;
+    print_sampler_state(w.position, w.momentum, false, step_size, momentum_sampler.get_dimensions());
 
     return w;
 }
@@ -198,12 +217,6 @@ auto MVNUTS::acceptance_probability(MVState w_new, MVState w_old) -> double
         return 1.0;
     }
 
-    // if (prob < 0.0)
-    // {
-    //     std::cout << "negative acceptance probability: " << prob << std::endl;
-    //     std::exit(1);
-    // }
-
     return prob;
 }
 
@@ -221,13 +234,13 @@ auto MVNUTS::is_u_turn(MVState leftmost_w, MVState rightmost_w) -> bool
            ((delta_position.transpose() * leftmost_w.momentum) < 0);
 }
 
-auto MVNUTS::build_tree(const BuildTreeParams &params) -> BuildTreeOutput
+auto MVNUTS::build_tree(const BuildTreeParamsMV &params) -> BuildTreeOutputMV
 {
     if (params.height == 0)
     {
         MVState w_new{leapfrog(params.initial_tree_w, params.dir)};
 
-        BuildTreeOutput output{
+        BuildTreeOutputMV output{
             // leftmost
             w_new,
             // rightmost
@@ -246,23 +259,23 @@ auto MVNUTS::build_tree(const BuildTreeParams &params) -> BuildTreeOutput
         return output;
     }
 
-    BuildTreeParams sub_tree_params = params;
+    BuildTreeParamsMV sub_tree_params = params;
     sub_tree_params.height -= 1;
-    BuildTreeOutput output{build_tree(sub_tree_params)};
+    BuildTreeOutputMV output{build_tree(sub_tree_params)};
 
-    BuildTreeOutput side_tree_output{};
+    BuildTreeOutputMV side_tree_output{};
     if (output.continue_integration)
     {
         if (params.dir == Direction::left)
         {
-            BuildTreeParams left_tree_params = sub_tree_params;
+            BuildTreeParamsMV left_tree_params = sub_tree_params;
             left_tree_params.initial_tree_w = output.leftmost_w;
             side_tree_output = build_tree(left_tree_params);
             output.leftmost_w = side_tree_output.leftmost_w;
         }
         else
         {
-            BuildTreeParams right_tree_params = sub_tree_params;
+            BuildTreeParamsMV right_tree_params = sub_tree_params;
             right_tree_params.initial_tree_w = output.rightmost_w;
             side_tree_output = build_tree(right_tree_params);
             output.rightmost_w = side_tree_output.rightmost_w;
@@ -320,14 +333,14 @@ auto MVNUTS::sample(
         MVState rightmost_w = initial_w;
         // s
         bool continue_integration{true};
-        BuildTreeParams new_sub_tree_params{initial_w, slice, Direction::right, tree_height, initial_w};
+        BuildTreeParamsMV new_sub_tree_params{initial_w, slice, Direction::right, tree_height, initial_w};
 
         while (continue_integration)
         {
             // v
             Direction v{sample_direction()};
 
-            BuildTreeOutput new_sub_tree{};
+            BuildTreeOutputMV new_sub_tree{};
             if (v == Direction::left)
             {
                 new_sub_tree_params.initial_tree_w = leftmost_w;
@@ -373,8 +386,7 @@ auto MVNUTS::sample(
 
         if (m > warm_up_iterations && successful_sample)
         {
-            std::cout << positions[m] << "\t" << 0 << "\t" << step_size << "\t"
-                      << "true" << std::endl;
+            print_sampler_state(positions[m], momentum_sampler.sample(), true, step_size, momentum_sampler.get_dimensions());
         }
     }
 

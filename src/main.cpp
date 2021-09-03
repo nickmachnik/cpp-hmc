@@ -69,15 +69,21 @@ auto main(int argc, char *argv[]) -> int
         double aim_acceptance_probability{strtod(argv[5], nullptr)};
 
         // Laplace target{3, 6};
+        // UVStandardNormalSampler momentum_sampler{};
+        // double position = initial_position;
+        // NUTS nuts{aim_acceptance_probability, target, momentum_sampler};
+
         Eigen::VectorXd position(2);
         position << initial_position, initial_position;
         Eigen::MatrixXd sigma(2, 2);
         sigma << 10, 7, 7, 5;
+        // sigma << 1, 0, 0, 1;
         Eigen::VectorXd mean(2);
         mean << 2, 2;
         MVN target{mean, sigma};
         MVStandardNormalSampler momentum_sampler{2};
         MVNUTS nuts{aim_acceptance_probability, target, momentum_sampler};
+
         nuts.sample(position, total_iterations, warm_up_iterations);
     }
     else
