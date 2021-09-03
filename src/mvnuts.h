@@ -123,7 +123,9 @@ private:
     void find_reasonable_step_size(Position position);
 
     double joint_density(MVState w);
+    double log_joint_density(MVState w);
     double integration_accuracy_threshold(MVState w);
+    double log_integration_accuracy_threshold(MVState w);
     double acceptance_probability(MVState w_new, MVState w_old);
     bool biased_coin_toss(double heads_probability);
     bool is_u_turn(MVState leftmost_w, MVState rightmost_w);
@@ -145,26 +147,38 @@ auto MVNUTS::joint_density(MVState w) -> double
     return exp(momentum_sampler.log_density(w.momentum) + target.log_density(w.position));
 }
 
+auto MVNUTS::log_joint_density(MVState w) -> double
+{
+    return momentum_sampler.log_density(w.momentum) + target.log_density(w.position);
+}
+
 // joint density of position and momentum
 auto MVNUTS::integration_accuracy_threshold(MVState w) -> double
 {
     return exp(delta_max + momentum_sampler.log_density(w.momentum) + target.log_density(w.position));
 }
 
+auto MVNUT::log_integration_accuracy_threshold(MVState w) -> double
+{
+    return delta_max + momentum_sampler.log_density(w.momentum) + target.log_density(w.position);
+}
+
 auto MVNUTS::leapfrog(MVState w, Direction dir) -> MVState
 {
+    print_sampler_state(w.position, w.momentum, false, step_size, momentum_sampler.get_dimensions());
+
     w.momentum += dir * 0.5 * step_size * target.log_density_gradient(w.position);
     w.position += dir * step_size * w.momentum;
     w.momentum += dir * 0.5 * step_size * target.log_density_gradient(w.position);
 
-    print_sampler_state(w.position, w.momentum, false, step_size, momentum_sampler.get_dimensions());
+    // print_sampler_state(w.position, w.momentum, false, step_size, momentum_sampler.get_dimensions());
 
     return w;
 }
 
 auto MVNUTS::step_size_is_reasonable(MVState w_old, MVState w_new, double a) -> bool
 {
-    return pow((joint_density(w_new) / joint_density(w_old)), a) <= pow(2, -a);
+    return pow(exp(log_joint_density(w_new) - log_joint_density(w_old)), a) <= pow(2, -a);
 }
 
 // see Hoffman and Gelman (2014)
@@ -173,12 +187,16 @@ void MVNUTS::find_reasonable_step_size(Position position)
     step_size = 1.0;
     MVState w{position, momentum_sampler.sample()};
     MVState w_new{leapfrog(w)};
-    double a{2.0 * ((joint_density(w_new) / joint_density(w)) > 0.5) - 1.0};
+
+    double a{2.0 * ((log_joint_density(w_new) - log_joint_density(w)) > log(0.5)) - 1.0};
+
     while (!step_size_is_reasonable(w, w_new, a))
     {
         step_size *= pow(2, a);
         w_new = leapfrog(w);
     }
+
+    std::cout << "found step size: " << step_size << std::endl;
 }
 
 auto MVNUTS::sample_slice_threshold(MVState w) -> double
@@ -310,7 +328,8 @@ auto MVNUTS::sample(
     double H{0.0};
     double alpha{};
     int n_alpha{};
-    double step_size_hat{1.0};
+    double log_step_size{log(step_size)};
+    double log_step_size_hat{0.0};
     bool successful_sample{true};
 
     for (size_t m{1}; m < total_iterations; ++m)
@@ -375,13 +394,14 @@ auto MVNUTS::sample(
             double f = 1.0 / (m + t_0);
             double av_alpha = alpha / double(n_alpha);
             H = (1.0 - f) * H + f * (sigma - av_alpha);
-            step_size = exp(mu - H * (sqrt(m) / gamma));
+            log_step_size = mu - H * (sqrt(m) / gamma);
             double mpk{pow(m, -kappa)};
-            step_size_hat = exp((mpk * log(step_size)) + ((1 - mpk) * log(step_size_hat)));
+            log_step_size_hat = (mpk * log_step_size) + ((1 - mpk) * log_step_size_hat);
+            step_size = exp(log_step_size);
         }
         else if (m == (warm_up_iterations + 1))
         {
-            step_size = step_size_hat;
+            step_size = exp(log_step_size_hat);
         }
 
         if (m > warm_up_iterations && successful_sample)
