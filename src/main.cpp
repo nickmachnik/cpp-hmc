@@ -71,6 +71,7 @@ auto main(int argc, char *argv[]) -> int
         Laplace target{100, 30};
         UVStandardNormalSampler momentum_sampler{};
         double position = initial_position;
+        // Sigma (aim_acceptance_prob) should probably default to 0.65, see hoffman and gelan
         NUTS nuts{aim_acceptance_probability, target, momentum_sampler};
 
         // Eigen::VectorXd position(2);
