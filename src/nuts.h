@@ -1,52 +1,161 @@
-#include <math.h>
-#include <random>
-#include <chrono>
-#include "nuts.h"
+#pragma once
 #include <iostream>
+#include <chrono>
+#include <random>
+#include <vector>
+#include "target.h"
+#include <math.h>
 #include <stdlib.h>
+#include "momentum_sampler.h"
 
-// logarithm of the density function of the auxiliary momentum
-auto NUTS::log_momentum_density(double momentum) -> double
+// a position-momentum state
+struct State
 {
-    return -0.5 * momentum * momentum;
+    double position;
+    double momentum;
+
+    State() : position{0.0}, momentum{0.0} {};
+    State(double position, double momentum) : position{position}, momentum{momentum} {};
+};
+
+void print_sampler_state(double pos, double mom, bool is_sample, double step_size)
+{
+    std::cout << pos << "\t" << mom << "\t" << step_size << "\t"
+              << is_sample << std::endl;
 }
 
-// joint density of position and momentum
-auto NUTS::joint_density(State w) -> double
+enum Direction
 {
-    return exp(log_momentum_density(w.momentum) + target.log_density(w.position));
+    left = -1,
+    right = 1,
+};
+
+struct BuildTreeParams
+{
+    State initial_tree_w;
+    double slice;
+    Direction dir;
+    int height;
+    State initial_chain_w;
+
+    BuildTreeParams(State initial_tree_w,
+                    double slice,
+                    Direction dir,
+                    int height,
+                    State initial_chain_w) : initial_tree_w{initial_tree_w},
+                                             slice{slice},
+                                             dir{dir},
+                                             height{height},
+                                             initial_chain_w{initial_chain_w} {};
+};
+
+struct BuildTreeOutput
+{
+    State leftmost_w;
+    State rightmost_w;
+    // theta'
+    double sampled_position{0.0};
+    // n'
+    int n_accepted_states{0};
+    // s'
+    bool continue_integration{true};
+    // alpha
+    double acceptance_probability{0.0};
+    // n_alpha
+    double total_states{0};
+
+    BuildTreeOutput() = default;
+
+    BuildTreeOutput(State leftmost_w,
+                    State rightmost_w,
+                    double sampled_position,
+                    int n_accepted_states,
+                    bool continue_integration,
+                    double acceptance_probability,
+                    double total_states) : leftmost_w{leftmost_w},
+                                           rightmost_w{rightmost_w},
+                                           sampled_position{sampled_position},
+                                           n_accepted_states{n_accepted_states},
+                                           continue_integration{continue_integration},
+                                           acceptance_probability{acceptance_probability},
+                                           total_states{total_states} {};
+};
+
+// A No-U-Turn Sampler with Dual Averaging.
+// Featuring dynamic integration length and automatic step size selection.
+class NUTS
+{
+private:
+    const double gamma{0.05};
+    const double t_0{10.0};
+    const double kappa{0.75};
+    const double delta_max{1000};
+
+    UVTarget &target;
+    UVMomentumSampler &momentum_sampler;
+    std::mt19937 rnd_generator{static_cast<unsigned long>(std::chrono::steady_clock::now().time_since_epoch().count())};
+    std::normal_distribution<double> standard_normal{0.0, 1.0};
+    double step_size{1.0};
+    // desired average acceptance rate
+    double sigma;
+
+    double sample_slice_threshold(State w);
+    Direction sample_direction();
+    State leapfrog(State w, Direction dir = Direction::right);
+    bool step_size_is_reasonable(State w_old, State w_new, double alpha);
+    void find_reasonable_step_size(double position);
+
+    double log_joint_density(State w);
+    double log_integration_accuracy_threshold(State w);
+    double acceptance_probability(State w_new, State w_old);
+    bool biased_coin_toss(double heads_probability);
+    bool is_u_turn(State leftmost_w, State rightmost_w);
+    BuildTreeOutput build_tree(const BuildTreeParams &params);
+
+public:
+    NUTS(UVTarget &target,
+         UVMomentumSampler &momentum_sampler,
+         double sigma = 0.65) : sigma{sigma},
+                                target{target},
+                                momentum_sampler{momentum_sampler} {};
+    std::vector<double> sample(double initial_position, size_t total_iterations, size_t warm_up_iterations);
+};
+
+auto NUTS::log_joint_density(State w) -> double
+{
+    return momentum_sampler.log_density(w.momentum) + target.log_density(w.position);
 }
 
-// joint density of position and momentum
-auto NUTS::integration_accuracy_threshold(State w) -> double
+auto NUTS::log_integration_accuracy_threshold(State w) -> double
 {
-    return exp(delta_max + log_momentum_density(w.momentum) + target.log_density(w.position));
+    return delta_max + momentum_sampler.log_density(w.momentum) + target.log_density(w.position);
 }
 
-auto NUTS::leapfrog(State w, Direction dir = Direction::right) -> State
+auto NUTS::leapfrog(State w, Direction dir) -> State
 {
+    print_sampler_state(w.position, w.momentum, false, step_size);
+
     w.momentum += dir * 0.5 * step_size * target.log_density_gradient(w.position);
     w.position += dir * step_size * w.momentum;
     w.momentum += dir * 0.5 * step_size * target.log_density_gradient(w.position);
-
-    std::cout << w.position << "\t" << w.momentum << "\t" << step_size << "\t"
-              << "false" << std::endl;
 
     return w;
 }
 
 auto NUTS::step_size_is_reasonable(State w_old, State w_new, double a) -> bool
 {
-    return pow((joint_density(w_new) / joint_density(w_old)), a) <= pow(2, -a);
+    return pow(exp(log_joint_density(w_new) - log_joint_density(w_old)), a) <= pow(2, -a);
 }
 
 // see Hoffman and Gelman (2014)
 void NUTS::find_reasonable_step_size(double position)
 {
     step_size = 1.0;
-    State w{position, sample_momentum()};
+    State w{position, momentum_sampler.sample()};
     State w_new{leapfrog(w)};
-    double a{2.0 * ((joint_density(w_new) / joint_density(w)) > 0.5) - 1.0};
+
+    double a{2.0 * ((log_joint_density(w_new) - log_joint_density(w)) > log(0.5)) - 1.0};
+
     while (!step_size_is_reasonable(w, w_new, a))
     {
         step_size *= pow(2, a);
@@ -59,7 +168,7 @@ auto NUTS::sample_slice_threshold(State w) -> double
     double upper_bound{
         exp(
             target.log_density(w.position) +
-            log_momentum_density(w.momentum))};
+            momentum_sampler.log_density(w.momentum))};
 
     std::uniform_real_distribution<double> u_dist(0.0, upper_bound);
 
@@ -78,28 +187,17 @@ auto NUTS::sample_direction() -> Direction
     return Direction::left;
 }
 
-auto NUTS::sample_momentum() -> double
-{
-    return standard_normal(rnd_generator);
-}
-
 auto NUTS::acceptance_probability(State w_new, State w_old) -> double
 {
     double prob{
         exp(
-            target.log_density(w_new.position) + log_momentum_density(w_new.momentum) -
-            target.log_density(w_old.position) - log_momentum_density(w_old.momentum))};
+            target.log_density(w_new.position) + momentum_sampler.log_density(w_new.momentum) -
+            target.log_density(w_old.position) - momentum_sampler.log_density(w_old.momentum))};
 
     if (prob > 1.0)
     {
         return 1.0;
     }
-
-    // if (prob < 0.0)
-    // {
-    //     std::cout << "negative acceptance probability: " << prob << std::endl;
-    //     std::exit(1);
-    // }
 
     return prob;
 }
@@ -114,7 +212,8 @@ auto NUTS::biased_coin_toss(double heads_probability) -> bool
 auto NUTS::is_u_turn(State leftmost_w, State rightmost_w) -> bool
 {
     double delta_position{rightmost_w.position - leftmost_w.position};
-    return ((delta_position * rightmost_w.momentum) < 0) || ((delta_position * leftmost_w.momentum) < 0);
+    return ((delta_position * rightmost_w.momentum) < 0) ||
+           ((delta_position * leftmost_w.momentum) < 0);
 }
 
 auto NUTS::build_tree(const BuildTreeParams &params) -> BuildTreeOutput
@@ -131,9 +230,9 @@ auto NUTS::build_tree(const BuildTreeParams &params) -> BuildTreeOutput
             // sampled position
             w_new.position,
             // n_accepted_states
-            (params.slice <= joint_density(w_new)) ? 1 : 0,
+            (log(params.slice) <= log_joint_density(w_new)) ? 1 : 0,
             // continue integration
-            params.slice < integration_accuracy_threshold(w_new),
+            log(params.slice) < log_integration_accuracy_threshold(w_new),
             // acceptance prob
             acceptance_probability(w_new, params.initial_chain_w),
             // total states
@@ -193,7 +292,8 @@ auto NUTS::sample(
     double H{0.0};
     double alpha{};
     int n_alpha{};
-    double step_size_hat{1.0};
+    double log_step_size{log(step_size)};
+    double log_step_size_hat{0.0};
     bool successful_sample{true};
 
     for (size_t m{1}; m < total_iterations; ++m)
@@ -209,7 +309,7 @@ auto NUTS::sample(
         // n
         int n_accepted_states{1};
         // theta^m = theta^m-1, resample r0
-        State initial_w{positions[m - 1], sample_momentum()};
+        State initial_w{positions[m - 1], momentum_sampler.sample()};
         // u
         double slice{sample_slice_threshold(initial_w)};
         State leftmost_w = initial_w;
@@ -258,19 +358,19 @@ auto NUTS::sample(
             double f = 1.0 / (m + t_0);
             double av_alpha = alpha / double(n_alpha);
             H = (1.0 - f) * H + f * (sigma - av_alpha);
-            step_size = exp(mu - H * (sqrt(m) / gamma));
+            log_step_size = mu - H * (sqrt(m) / gamma);
             double mpk{pow(m, -kappa)};
-            step_size_hat = exp((mpk * log(step_size)) + ((1 - mpk) * log(step_size_hat)));
+            log_step_size_hat = (mpk * log_step_size) + ((1 - mpk) * log_step_size_hat);
+            step_size = exp(log_step_size);
         }
         else if (m == (warm_up_iterations + 1))
         {
-            step_size = step_size_hat;
+            step_size = exp(log_step_size_hat);
         }
 
         if (m > warm_up_iterations && successful_sample)
         {
-            std::cout << positions[m] << "\t" << 0 << "\t" << step_size << "\t"
-                      << "true" << std::endl;
+            print_sampler_state(positions[m], momentum_sampler.sample(), true, step_size);
         }
     }
 

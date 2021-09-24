@@ -4,6 +4,8 @@
 #include <cstring>
 #include "hmc.h"
 #include "nuts.h"
+#include "mvnuts.h"
+#include "momentum_sampler.h"
 #include "target.h"
 
 // gradient computes the gradient of the negative logarithm of the target density.
@@ -52,23 +54,36 @@ auto main(int argc, char *argv[]) -> int
     }
     else if (strcmp(argv[1], "nuts") == 0)
     {
-        if (argc != 6)
+        if (argc != 5)
         {
             std::cout
-                << "Expected 5 arguments ('nuts', double initial_position, int total_iterations, int warm_up_iterations, double sigma), but got "
+                << "Expected 4 arguments ('nuts', double initial_position, int total_iterations, int warm_up_iterations), but got "
                 << argc - 1 << std::endl;
 
             return 1;
         }
 
-        double position{strtod(argv[2], nullptr)};
+        double initial_position{strtod(argv[2], nullptr)};
         size_t total_iterations{static_cast<size_t>(strtol(argv[3], nullptr, 10))};
         size_t warm_up_iterations{static_cast<size_t>(strtol(argv[4], nullptr, 10))};
-        double sigma{strtod(argv[5], nullptr)};
 
-        Laplace target{3, 6};
-        NUTS nuts{sigma, target};
-        std::vector<double> res{nuts.sample(position, total_iterations, warm_up_iterations)};
+        Laplace target{100, 30};
+        UVStandardNormalSampler momentum_sampler{};
+        double position = initial_position;
+        // Sigma (aim_acceptance_prob) should probably default to 0.65, see hoffman and gelan
+        NUTS nuts{target, momentum_sampler};
+
+        // Eigen::VectorXd position(2);
+        // position << initial_position, initial_position;
+        // Eigen::MatrixXd sigma(2, 2);
+        // sigma << 10, 7, 7, 5;
+        // Eigen::VectorXd mean(2);
+        // mean << 100, 100;
+        // MVN target{mean, sigma};
+        // MVStandardNormalSampler momentum_sampler{2};
+        // MVNUTS nuts{aim_acceptance_probability, target, momentum_sampler};
+
+        nuts.sample(position, total_iterations, warm_up_iterations);
     }
     else
     {

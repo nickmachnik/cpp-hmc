@@ -1,7 +1,17 @@
 #pragma once
 #include <cmath>
+#include <Eigen/Dense>
 
-class Target
+class MVTarget
+{
+public:
+    // Logarithm of the target density function.
+    virtual double log_density(Eigen::VectorXd position) = 0;
+    // Gradient of the log target density function.
+    virtual Eigen::VectorXd log_density_gradient(Eigen::VectorXd position) = 0;
+};
+
+class UVTarget
 {
 public:
     // Logarithm of the target density function.
@@ -10,7 +20,37 @@ public:
     virtual double log_density_gradient(double position) = 0;
 };
 
-class Laplace : public Target
+class MVN : public MVTarget
+{
+private:
+    double d;
+    double log2pi = log(2 * M_PI);
+    const Eigen::VectorXd &mean;
+    const Eigen::MatrixXd &sigma;
+    double log_sigma_determinant;
+    Eigen::MatrixXd sigma_inverse;
+
+public:
+    MVN(const Eigen::VectorXd &mean, const Eigen::MatrixXd &sigma) : mean{mean}, sigma{sigma}, d{mean.rows()}
+    {
+        log_sigma_determinant = log(sigma.determinant());
+        sigma_inverse = sigma.inverse();
+    }
+
+    double log_density(Eigen::VectorXd position)
+    {
+        return -0.5 * ((d * log2pi) +
+                       log_sigma_determinant +
+                       ((position - mean).transpose() * sigma_inverse * (position - mean)));
+    }
+
+    Eigen::VectorXd log_density_gradient(Eigen::VectorXd position)
+    {
+        return -sigma_inverse * (position - mean);
+    }
+};
+
+class Laplace : public UVTarget
 {
 private:
     // mean
@@ -39,7 +79,7 @@ public:
     }
 };
 
-class StandardNormal : public Target
+class StandardNormal : public UVTarget
 {
 public:
     double log_density(double position)
@@ -52,7 +92,7 @@ public:
     }
 };
 
-class UnscaledStandardNormal : public Target
+class UnscaledStandardNormal : public UVTarget
 {
 public:
     double log_density(double position)
