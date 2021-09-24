@@ -113,12 +113,11 @@ private:
     BuildTreeOutput build_tree(const BuildTreeParams &params);
 
 public:
-    NUTS(
-        double sigma,
-        UVTarget &target,
-        UVMomentumSampler &momentum_sampler) : sigma{sigma},
-                                               target{target},
-                                               momentum_sampler{momentum_sampler} {};
+    NUTS(UVTarget &target,
+         UVMomentumSampler &momentum_sampler,
+         double sigma = 0.65) : sigma{sigma},
+                                target{target},
+                                momentum_sampler{momentum_sampler} {};
     std::vector<double> sample(double initial_position, size_t total_iterations, size_t warm_up_iterations);
 };
 

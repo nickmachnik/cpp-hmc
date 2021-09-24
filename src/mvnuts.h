@@ -130,11 +130,11 @@ private:
     BuildTreeOutputMV build_tree(const BuildTreeParamsMV &params);
 
 public:
-    MVNUTS(double sigma,
-           MVTarget &target,
-           MVMomentumSampler &momentum_sampler) : sigma{sigma},
-                                                  target{target},
-                                                  momentum_sampler{momentum_sampler} {};
+    MVNUTS(MVTarget &target,
+           MVMomentumSampler &momentum_sampler,
+           double sigma = 0.65) : sigma{sigma},
+                                  target{target},
+                                  momentum_sampler{momentum_sampler} {};
 
     std::vector<Position> sample(Position initial_position, size_t total_iterations, size_t warm_up_iterations);
 };

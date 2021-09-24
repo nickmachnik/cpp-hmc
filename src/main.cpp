@@ -54,10 +54,10 @@ auto main(int argc, char *argv[]) -> int
     }
     else if (strcmp(argv[1], "nuts") == 0)
     {
-        if (argc != 6)
+        if (argc != 5)
         {
             std::cout
-                << "Expected 5 arguments ('nuts', double initial_position, int total_iterations, int warm_up_iterations, double sigma), but got "
+                << "Expected 4 arguments ('nuts', double initial_position, int total_iterations, int warm_up_iterations), but got "
                 << argc - 1 << std::endl;
 
             return 1;
@@ -66,13 +66,12 @@ auto main(int argc, char *argv[]) -> int
         double initial_position{strtod(argv[2], nullptr)};
         size_t total_iterations{static_cast<size_t>(strtol(argv[3], nullptr, 10))};
         size_t warm_up_iterations{static_cast<size_t>(strtol(argv[4], nullptr, 10))};
-        double aim_acceptance_probability{strtod(argv[5], nullptr)};
 
         Laplace target{100, 30};
         UVStandardNormalSampler momentum_sampler{};
         double position = initial_position;
         // Sigma (aim_acceptance_prob) should probably default to 0.65, see hoffman and gelan
-        NUTS nuts{aim_acceptance_probability, target, momentum_sampler};
+        NUTS nuts{target, momentum_sampler};
 
         // Eigen::VectorXd position(2);
         // position << initial_position, initial_position;
