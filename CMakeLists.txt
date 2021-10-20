@@ -3,8 +3,16 @@ project(hmc)
 
 set(CMAKE_CXX_STANDARD 17)
 
-include_directories(src)
-include_directories(lib/eigen)
+# ------ stuff in src, for main binary
+file(GLOB_RECURSE SRC LIST_DIRECTORIES true src/*.hpp src/*.cpp)
+set(SRC ${SRC})
 
-add_subdirectory(src)
+add_executable(
+    ${PROJECT_NAME}
+    ${SRC}
+)
+
+target_include_directories(${PROJECT_NAME} PUBLIC src)
+target_include_directories(${PROJECT_NAME} PUBLIC lib/eigen)
+
 add_subdirectory(lib/eigen)
