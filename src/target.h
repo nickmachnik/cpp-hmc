@@ -31,7 +31,7 @@ private:
     Eigen::MatrixXd sigma_inverse;
 
 public:
-    MVN(const Eigen::VectorXd &mean, const Eigen::MatrixXd &sigma) : mean{mean}, sigma{sigma}, d{mean.rows()}
+    MVN(const Eigen::VectorXd &mean, const Eigen::MatrixXd &sigma) : mean{mean}, sigma{sigma}, d{static_cast<double>(mean.rows())}
     {
         log_sigma_determinant = log(sigma.determinant());
         sigma_inverse = sigma.inverse();
